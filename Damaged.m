@@ -1,0 +1,104 @@
+clc; close all; clear all;
+
+%Bridge Parameters
+L=25; % Length m
+E=3.5*10^10; % Modulus of Elasticity of concrete N/m^2
+I=1.39; % Moment of Inertia m^4
+mu=18358; % mass per unit length kg/m
+mb=mu*L/2; % mass of bridge kg
+J=1; % Mode
+
+%Temperature and Humidity Variables
+Tl=load('lowdata.dat');
+Th=load('highdata.dat');
+To=35; %temp that correlates to virtually no asphault stiffness
+Tavg=16.67; %Average temperature in SC in degrees celsius
+ho=50; % relative humidity at static modulus
+Td=0:.0168:24; %Time of day record was taken
+n=length(Td);%number of cases looking at a single car crossing bridge
+nn=0; % Total runs performed on bridge
+
+% Vehicle Input
+c=8.94+(44.704-8.94).*rand(1,n); % Speed mps
+dmv=round(2722+(14515-2722).*rand(1,n)); %vehicle mass
+O=29*pi; %Circumference of tire (Needs to be varied with vehicle mass)
+
+% Damage Information
+D1=5000; % Number of runs required for first damage to occure
+% Pd1=.05+(.15-.05).*rand(1); % Percent damage that occured at first damage
+Pd1=0.15;
+D2=10000; % Number of runs required for damage to intensify
+% Pd2=.05+(.15-.05).*rand(1); % Precent damage that occured at second damage
+Pd2=0.15;
+D3=15000; % Number of runs required for damage to intensify
+% Pd3=.05+(.15-.05).*rand(1); % Precent damage that occured at second damage
+Pd3=0.15;
+
+wn=zeros(1,n);
+parfor ii=1:10
+    At(ii)=(Th(ii)-Tl(ii))/2; %Amplitude for temperature curve
+    Dt(ii)=(Th(ii)+Tl(ii))/2; %Midline for temperature curve
+
+    for j=1:n
+        % Damage Reduction
+        Er=Ereduce(nn,E,D1,D2,D3,Pd1,Pd2,Pd3);
+        kb=48*Er*I/L.^3; % stiffness of beam N/m
+
+        Tact(ii,:)=(At(ii)*cos((Td+1)*.2618)+(Dt(ii)+((Dt(ii)+1)-Dt(ii)).*rand(1,length(Td)))); %Actual temperature
+        dt(ii,:)=Tact(ii,:)-To;%total change in temp relative to max
+        dEa(ii,:)=(-2.13*10^8)*dt(ii,:); %change in road surface elastic modulus 
+        dkc(ii,:)=-.0045*(Tact(ii,:)-Tavg); %change in frequency due to concrete temp change
+
+        %humidity effects
+        rh(ii,:)=ho-(At(ii)*cos((Td+1)*.2618)+(Dt(ii)+((Dt(ii)+1)-Dt(ii)).*rand(1,length(Td))));
+        dmh(ii,:)=-.0006*(rh(ii,:)-ho);% change in concrete modulus due to humidity
+
+        %Changes to Mass
+        m(ii,j)=mb+mb*dmh(ii,j);% total mass of bridge
+        mun(ii,j)=m(ii,j)/(L/2); % New mass per unit length
+        P(j)=dmv(j)*9.81; %Point Load of Vehicle
+        G(ii,j)=mun(ii,j)*L*9.81; %Total weight of bridge
+        muu(ii,j)=mun(ii,j)*(1+2*P(j)/G(ii,j)); %Modified kg/m
+
+        %Altered Natural Frequency
+        k(ii,j)=48*(Er+dEa(ii,j))*I/L.^3+kb*dkc(ii,j); %Total stiffness
+        wn(ii,j)=sqrt(J^4*(k(ii,j)/m(j))*(mun(ii,j)/muu(ii,j))); % modified circular frequency to include vehicle mass
+        wn1(ii,j)=sqrt((k(ii,j)/m(j))*(mun(ii,j)/muu(ii,j))); % modified 1st circular frequency to include vehicle mass
+        f1(ii,j)=(sqrt((k(ii,j)/m(j)))/(2*pi))*(1+2*P(j)/G(ii,j))^(-.5); % modified 1st natural frequency (in HZ)
+        cr(ii,j)=f1(ii,j)*O; % Critical Speed
+        T=0:.01:L/c(j); %Time Step for vehicle across bridge
+        q(j)=length(T);
+        w(j)=pi*c(j)/L; %Circular frequency
+        alpha(ii,j)=w(j)/wn1(ii,j);
+        beta=.03+.04*.03; %total damping including effects from vehicles
+        logd=2*pi*beta; %log decrement of bridge
+        wb(ii,j)=f1(ii,j)*logd; % modified circular frequency of damping
+
+        x=L/2;
+
+        % Harmonic Variables
+        if c(j)==cr(ii,j)
+            rev(ii,j)=f1(ii,j); %Revolutions per second
+        else
+            rev(ii,j)=c(j)/O;
+        end
+        omg(ii,j)=2*pi*rev(ii,j); % Circular frequency of force
+        Q(ii,j)=3*rev(ii,j)^2*1000; %Amplitude of force (Need to research range)
+        b=(L-x);
+        vo(j)=-P(j)*b*x/(6*L*Er*I)*(L^2-x.^2-b.^2); % Initial Static Displacement at pt x
+        for i=1:q(j) % Time for vehicle to enter and exit bridge
+            % Chapter 1 equations
+            disp1(i,j,ii)=-vo(j)*sin(w(j)*T(i))*sin(pi*x/L); %equation 1.41
+            % Chapter 2 equations
+            disp3(i,j,ii)=-vo(j)*(Q(ii,j)/P(j))*(wn1(ii,j)^2/omg(ii,j)^2)*(1/((wn1(ii,j)^2/omg(ii,j)^2-1)^2+4*(w(j)^2/omg(ii,j)^2+wb(ii,j)^2/omg(ii,j)^2)))*(((wn1(ii,j)^2/omg(ii,j)^2-1)^2+4*(wb(ii,j)^2/omg(ii,j)^2))^(.5)*sin(omg(ii,j)*T(i))*sin(w(j)*T(i))+2*(w(j)/omg(ii,j))*(cos(omg(ii,j)*T(i))*cos(w(j)*T(i))-exp(-wb(ii,j)*T(i))*cos(wn1(ii,j)*T(i))))*sin(pi*x/L); %equation 2.7 (tested for correctness)
+            %  Deflection Totals
+            dispT1(i,j,ii)=disp1(i,j,ii)+disp3(i,j,ii);
+        end
+
+        umaxT1=max(dispT1);
+        nn=nn+1;  % Setting up for next run
+
+    end
+end
+
+
