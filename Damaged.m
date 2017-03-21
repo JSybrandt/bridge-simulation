@@ -109,7 +109,7 @@ parfor day=1:numDays
                     (cos(circFreqForce*cTime)*cos(vehicleCircFreq*cTime)-exp(-modCircFreq*cTime)*cos(circFreq*cTime))...
                 )*sin(pi*.5); %equation 2.7 (tested for correctness)
             %  Deflection Totals
-            totalDisp=disp1+disp2;
+            totalDisp=abs(disp1+disp2);
             if(totalDisp > maxDisp)
                 maxDisp = totalDisp;
             end
