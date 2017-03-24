@@ -9,56 +9,50 @@ massBridge=density*bridgeLength/2; % mass of bridge kg
 mode=1; % Mode
 
 %Temperature and Humidity Variables
-lowTemp=load('lowdata.dat');
-highTemp=load('highdata.dat');
+lowTemp=load('../data/lowdata.dat');
+highTemp=load('../data/highdata.dat');
 initTemp=35; %temp that correlates to virtually no asphault stiffness
 avgTemp=16.67; %Average temperature in SC in degrees celsius
 initHumidity=50; % relative humidity at static modulus
 timeOfDay=0:.0168:24; %Time of day record was taken
 numTrialsPerDay=length(timeOfDay);%number of cases looking at a single car crossing bridge
-numDays = 365;
+numDays = 20;
 
 tireCircumference=29*pi; %Circumference of tire (Needs to be varied with vehicle mass)
 
 % Damage Information
 D1=5000; % Number of runs required for first damage to occure
 % Pd1=.05+(.15-.05).*rand(1); % Percent damage that occured at first damage
-Pd1=0.15;
-D2=10000; % Number of runs required for damage to intensify
-% Pd2=.05+(.15-.05).*rand(1); % Precent damage that occured at second damage
-Pd2=0.15;
-D3=15000; % Number of runs required for damage to intensify
-% Pd3=.05+(.15-.05).*rand(1); % Precent damage that occured at second damage
-Pd3=0.15;
+damageCoef = 0.15;
 
 beta=.03+.04*.03; %total damping including effects from vehicles
 lgDecrement=2*pi*beta; %log decrement of bridge
 
-numFeatures = 12;
+numFeatures = 5;
 
 %results = zeros(numDays, numTrialsPerDay, numFeatures);
 results = zeros(numTrialsPerDay, numFeatures, numDays);
 
 for day=1:numDays
-        
+
     % bridge effects
     tempAmp=(highTemp(day)-lowTemp(day))/2; %Amplitude for temperature curve
     tempML=(highTemp(day)+lowTemp(day))/2; %Midline for temperature curve
-    
-    label = idivide(4*day, numDays, 'floor');
-    damange=Ereduce(label,modElasticity,Pd1,Pd2,Pd3);                                 % Damage Reduction
-    stiffness=48*damange*intertia/bridgeLength.^3;                                            % stiffness of beam N/m
+
+    label = floor(rand()*4);
+    damage = (1 - damageCoef * label) * modElasticity;
+    stiffness=48*damage*intertia/bridgeLength.^3;
 
     % for each trail
     for trial=1:numTrialsPerDay
         % Vehicle Input
         speedVehicle=8.94+(44.704-8.94).*rand(); % Speed mps
         massVehicle=round(2722+(14515-2722).*rand()); %vehicle mass
-        
+
         trialStartTime = timeOfDay(trial);
         tempAct=tempAmp*cos(trialStartTime*.2618) + tempML+rand();               %Actual temperature
         tempChange=tempAct-initTemp;                                                           %total change in temp relative to max
-        surfaceElasticChange=(-2.13*10^8)*tempChange;                                                  %change in road surface elastic modulus 
+        surfaceElasticChange=(-2.13*10^8)*tempChange;                                                  %change in road surface elastic modulus
         freqChange=-.0045*(tempAct-avgTemp);                                               %change in frequency due to concrete temp change
 
         %humidity effects
@@ -67,20 +61,20 @@ for day=1:numDays
 
         %Changes to Mass
         cMass=massBridge+massBridge*concreteElasticChange;% total mass of bridge
-        cDensity=cMass/(bridgeLength/2); % New mass per unit length
+        cDensity=2*cMass/bridgeLength; % New mass per unit length
         pointLoad=massVehicle*9.81; %Point Load of Vehicle
         weightBridge=cDensity*bridgeLength*9.81; %Total weight of bridge
         modifiedDensity=cDensity*(1+2*pointLoad/weightBridge); %Modified kg/m
 
-        cStiffness=48*(damange+surfaceElasticChange)*intertia/bridgeLength^3+stiffness*freqChange; %Total stiffness
-        
+        cStiffness=48*(damage+surfaceElasticChange)*intertia/bridgeLength^3+stiffness*freqChange; %Total stiffness
+
         circFreq=sqrt((cStiffness/cMass)*(cDensity/modifiedDensity)); % modified 1st circular frequency to include vehicle mass
         natFreq=(sqrt((cStiffness/cMass))/(2*pi))*(1+2*pointLoad/weightBridge)^(-.5); % modified 1st natural frequency (in HZ)
         critSpeed=natFreq*tireCircumference; % Critical Speed
-            
+
         vehicleCircFreq=pi*speedVehicle/bridgeLength; %Circular frequency
         alpha=vehicleCircFreq/circFreq;
-        
+
         modCircFreq=natFreq*lgDecrement; % modified circular frequency of damping
 
         % Harmonic Variables
@@ -91,10 +85,10 @@ for day=1:numDays
             revPerSec=speedVehicle/tireCircumference;
         end
         circFreqForce=2*pi*revPerSec; % Circular frequency of force
-        
+
         ampForce=3*revPerSec^2*1000; %Amplitude of force (Need to research range)
-        
-        initStatDisp=-pointLoad*bridgeLength^4/(48*bridgeLength*damange*intertia); % Initial Static Displacement at pt x
+
+        initStatDisp=-pointLoad*bridgeLength^4/(48*bridgeLength*damage*intertia); % Initial Static Displacement at pt x
         maxDisp = -Inf;
         for cTime=0:.01:bridgeLength/speedVehicle % Time for vehicle to enter and exit bridge
 
@@ -116,15 +110,15 @@ for day=1:numDays
             end
         end
 
-        outputVars = [label, damange, maxDisp, natFreq, cStiffness, modifiedDensity, cMass, speedVehicle, pointLoad, tempAct, relativeHumidity, day];
-        results(trial,:,day) = outputVars; 
+        % results(trial,:,day) = [label, damange, maxDisp, natFreq, cStiffness, modifiedDensity, cMass, speedVehicle, pointLoad, tempAct, relativeHumidity, day];
+        results(trial,:,day) = [label, modifiedDensity, maxDisp, tempAct, bridgeLength];
     end
 end
 
 % Convert the 3d matrix into a 2d training set
-singleBridgeData = permute(results,[1 3 2]);
-singleBridgeData = reshape(singleBridgeData,[],size(results,2),1);
+bridgeData = permute(results,[1 3 2]);
+bridgeData = reshape(bridgeData,[],size(results,2),1);
 
-save('singleBridge.mat','singleBridgeData')
+save('../data/bridgeData.mat','bridgeData')
 
 

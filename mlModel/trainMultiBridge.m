@@ -1,5 +1,5 @@
 clc; close all; clear all;
-load('../data/bridgeData.mat');
+load('../data/multiBridgeData.mat');
 
 % Note: The following applies to initial trials
 % Features : 
@@ -29,7 +29,7 @@ trainingSet = bridgeData(1:trainingSetSize,2:end);
 
 disp('Training:')
 model = svmtrain(trainingLabels, trainingSet, ...
-    '-s 0 -t 0 -h 0 -q');
+    '-s 0 -t 2 -h 0 -q');
 
 disp('TRAINING SET:')
 trainingPredictions = svmpredict(...
