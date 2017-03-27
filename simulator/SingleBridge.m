@@ -28,7 +28,7 @@ damageCoef = 0.15;
 beta=.03+.04*.03; %total damping including effects from vehicles
 lgDecrement=2*pi*beta; %log decrement of bridge
 
-numFeatures = 5;
+numFeatures = 4;
 
 %results = zeros(numDays, numTrialsPerDay, numFeatures);
 results = zeros(numTrialsPerDay, numFeatures, numDays);
@@ -111,7 +111,7 @@ for day=1:numDays
         end
 
         % results(trial,:,day) = [label, damange, maxDisp, natFreq, cStiffness, modifiedDensity, cMass, speedVehicle, pointLoad, tempAct, relativeHumidity, day];
-        results(trial,:,day) = [label, modifiedDensity, maxDisp, tempAct, bridgeLength];
+        results(trial,:,day) = [label, modifiedDensity, maxDisp, tempAct];
     end
 end
 
@@ -119,6 +119,6 @@ end
 bridgeData = permute(results,[1 3 2]);
 bridgeData = reshape(bridgeData,[],size(results,2),1);
 
-save('../data/bridgeData.mat','bridgeData')
+save('../data/singleBridgeData.mat','bridgeData')
 
 

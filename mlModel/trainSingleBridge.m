@@ -1,5 +1,5 @@
 clc; close all; clear all;
-load('../data/bridgeData.mat');
+load('../data/singleBridgeData.mat');
 
 % Note: The following applies to initial trials
 % Features : 
@@ -41,3 +41,6 @@ disp('CROSS VALIDATION SET:')
     bridgeData(trainingSetSize:end, 1),... validation labels
     bridgeData(trainingSetSize:end, 2:end),... validation set
     model);
+
+save('../data/singleBridgeModel.mat','model')
+
