@@ -13,7 +13,7 @@ load('../data/singleBridgeData.mat');
 
 disp('Standardizing:')
 %standardize data
-bridgeData(:,2:end) = zscore(bridgeData(:,2:end));
+[bridgeData(:,2:end),mu,sig] = zscore(bridgeData(:,2:end));
 
 numPoints = size(bridgeData, 1);
 
@@ -42,5 +42,24 @@ disp('CROSS VALIDATION SET:')
     bridgeData(trainingSetSize:end, 2:end),... validation set
     model);
 
-save('../data/singleBridgeModel.mat','model')
+save('../data/singleBridgeModel.mat','model','mu','sig')
+
+
+disp('Training Single Classifier:')
+twoClassModel = svmtrain(double(trainingLabels==0), trainingSet, ...
+    '-s 0 -t 0 -h 0 -q');
+
+disp('TRAINING SET:')
+trainingPredictions = svmpredict(...
+    double(trainingLabels==0), trainingSet, ...
+    twoClassModel);
+
+disp('CROSS VALIDATION SET:')
+[validationPredictions, acc, decVals] = svmpredict(...
+    double(bridgeData(trainingSetSize:end, 1)==0),... validation labels
+    bridgeData(trainingSetSize:end, 2:end),... validation set
+    twoClassModel);
+
+
+save('../data/singleBridgeTwoClassModel.mat','twoClassModel','mu','sig')
 
